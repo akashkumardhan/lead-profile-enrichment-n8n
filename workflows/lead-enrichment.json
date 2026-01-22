@@ -1,0 +1,880 @@
+{
+  "name": "Lead Profile Enrichment Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-enrichment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "New Signup Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400],
+      "webhookId": "lead-enrichment-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract domain and validate email\nconst email = $input.first().json.email || '';\nconst websiteUrl = $input.first().json.website_url || '';\nconst signupPlan = $input.first().json.signup_plan || 'free';\nconst userId = $input.first().json.user_id || 'unknown';\nconst signupTimestamp = $input.first().json.signup_timestamp || new Date().toISOString();\n\n// Extract domain from email\nconst emailDomain = email.split('@')[1] || '';\n\n// Extract domain from website URL\nlet websiteDomain = '';\ntry {\n  const url = new URL(websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`);\n  websiteDomain = url.hostname.replace('www.', '');\n} catch (e) {\n  websiteDomain = websiteUrl.replace(/^(https?:\\/\\/)?(www\\.)?/, '').split('/')[0];\n}\n\n// Check if personal email\nconst personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'aol.com', 'protonmail.com', 'mail.com'];\nconst isPersonalEmail = personalDomains.includes(emailDomain.toLowerCase());\n\n// Use website domain as company domain if email is personal\nconst companyDomain = isPersonalEmail ? websiteDomain : emailDomain;\n\nreturn {\n  email,\n  emailDomain,\n  websiteUrl,\n  websiteDomain,\n  companyDomain,\n  isPersonalEmail,\n  signupPlan,\n  userId,\n  signupTimestamp\n};"
+      },
+      "id": "extract-domain",
+      "name": "Extract Domain Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 400]
+    },
+    {
+      "parameters": {},
+      "id": "parallel-split",
+      "name": "Parallel Enrichment",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [600, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.hunter.io/v2/domain-search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $json.companyDomain }}"
+            },
+            {
+              "name": "api_key",
+              "value": "={{ $credentials.hunterApiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "hunter-domain",
+      "name": "Hunter.io Domain Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 200],
+      "continueOnFail": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "hunter-auth",
+          "name": "Hunter API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.hunter.io/v2/email-verifier",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $('Extract Domain Info').item.json.email }}"
+            },
+            {
+              "name": "api_key",
+              "value": "={{ $credentials.hunterApiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "hunter-verify",
+      "name": "Hunter.io Email Verify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 350],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://person.clearbit.com/v2/people/find",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $('Extract Domain Info').item.json.email }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $credentials.clearbitApiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "clearbit-person",
+      "name": "Clearbit Person Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://company.clearbit.com/v2/companies/find",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $('Extract Domain Info').item.json.companyDomain }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $credentials.clearbitApiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "clearbit-company",
+      "name": "Clearbit Company Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 650],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.wappalyzer.com/v2/lookup/",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "urls",
+              "value": "={{ $('Extract Domain Info').item.json.websiteUrl }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $credentials.wappalyzerApiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "wappalyzer",
+      "name": "Wappalyzer Tech Stack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 800],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.pdl.com/v5/company/enrich",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "website",
+              "value": "={{ $('Extract Domain Info').item.json.companyDomain }}"
+            },
+            {
+              "name": "api_key",
+              "value": "={{ $credentials.pdlApiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "pdl-company",
+      "name": "PDL Company Enrich",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 950],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "mergeByFields": {
+          "values": []
+        },
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "merge-data",
+      "name": "Merge Enrichment Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1050, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get data from all enrichment sources\nconst domainInfo = $('Extract Domain Info').first().json;\nconst hunterDomain = $('Hunter.io Domain Search').first()?.json?.data || {};\nconst hunterVerify = $('Hunter.io Email Verify').first()?.json?.data || {};\nconst clearbitPerson = $('Clearbit Person Lookup').first()?.json || {};\nconst clearbitCompany = $('Clearbit Company Lookup').first()?.json || {};\nconst wappalyzer = $('Wappalyzer Tech Stack').first()?.json || [];\nconst pdlCompany = $('PDL Company Enrich').first()?.json || {};\n\n// Process Wappalyzer data\nconst techData = Array.isArray(wappalyzer) ? wappalyzer[0] : wappalyzer;\nconst technologies = techData?.technologies || [];\n\n// Detect platform\nfunction detectPlatform(techs) {\n  const techNames = techs.map(t => (t.name || t).toLowerCase());\n  if (techNames.some(t => t.includes('shopify'))) return 'Shopify';\n  if (techNames.some(t => t.includes('woocommerce'))) return 'WooCommerce';\n  if (techNames.some(t => t.includes('magento'))) return 'Magento';\n  if (techNames.some(t => t.includes('bigcommerce'))) return 'BigCommerce';\n  if (techNames.some(t => t.includes('prestashop'))) return 'PrestaShop';\n  if (techNames.some(t => t.includes('opencart'))) return 'OpenCart';\n  if (techNames.some(t => t.includes('wordpress'))) return 'WordPress';\n  if (techNames.some(t => t.includes('squarespace'))) return 'Squarespace';\n  if (techNames.some(t => t.includes('wix'))) return 'Wix';\n  return 'Custom/Unknown';\n}\n\n// Detect competitor tools\nfunction detectCompetitorTools(techs) {\n  const techNames = techs.map(t => (t.name || t).toLowerCase());\n  return {\n    uses_onesignal: techNames.some(t => t.includes('onesignal')),\n    uses_pushengage: techNames.some(t => t.includes('pushengage')),\n    uses_pushowl: techNames.some(t => t.includes('pushowl')),\n    uses_firebase_push: techNames.some(t => t.includes('firebase')),\n    uses_intercom: techNames.some(t => t.includes('intercom')),\n    uses_drift: techNames.some(t => t.includes('drift')),\n    marketing_tools: techs.filter(t => {\n      const name = (t.name || t).toLowerCase();\n      return name.includes('analytics') || name.includes('marketing') || \n             name.includes('push') || name.includes('notification') || \n             name.includes('email') || name.includes('chat');\n    }).map(t => t.name || t)\n  };\n}\n\n// Map country to currency\nfunction mapCountryToCurrency(country) {\n  const currencyMap = {\n    'United States': 'USD', 'US': 'USD',\n    'United Kingdom': 'GBP', 'UK': 'GBP', 'GB': 'GBP',\n    'Germany': 'EUR', 'DE': 'EUR',\n    'France': 'EUR', 'FR': 'EUR',\n    'Italy': 'EUR', 'IT': 'EUR',\n    'Spain': 'EUR', 'ES': 'EUR',\n    'Netherlands': 'EUR', 'NL': 'EUR',\n    'India': 'INR', 'IN': 'INR',\n    'Canada': 'CAD', 'CA': 'CAD',\n    'Australia': 'AUD', 'AU': 'AUD',\n    'Japan': 'JPY', 'JP': 'JPY',\n    'Brazil': 'BRL', 'BR': 'BRL',\n    'Mexico': 'MXN', 'MX': 'MXN',\n    'Singapore': 'SGD', 'SG': 'SGD'\n  };\n  return currencyMap[country] || 'USD';\n}\n\n// Calculate enrichment quality score\nfunction calculateEnrichmentQuality(data) {\n  let score = 0;\n  if (data.company_profile?.name && data.company_profile.name !== 'Unknown') score += 20;\n  if (data.company_profile?.industry && data.company_profile.industry !== 'Unknown') score += 20;\n  if (data.site_profile?.platform && data.site_profile.platform !== 'Custom/Unknown') score += 20;\n  if (data.user_profile?.country && data.user_profile.country !== 'Unknown') score += 15;\n  if (data.social_profiles?.linkedin) score += 15;\n  if (data.traffic?.estimated_traffic && data.traffic.estimated_traffic !== 'Unknown') score += 10;\n  return score;\n}\n\n// Get country from various sources\nconst country = clearbitPerson?.geo?.country || \n                clearbitCompany?.geo?.country || \n                pdlCompany?.location?.country ||\n                hunterDomain?.country || \n                'Unknown';\n\n// Build enriched profile\nconst enrichedProfile = {\n  // Original Input\n  email: domainInfo.email,\n  website_url: domainInfo.websiteUrl,\n  company_domain: domainInfo.companyDomain,\n  signup_plan: domainInfo.signupPlan,\n  user_id: domainInfo.userId,\n  signup_timestamp: domainInfo.signupTimestamp,\n  is_personal_email: domainInfo.isPersonalEmail,\n  \n  // Email Verification\n  email_verification: {\n    status: hunterVerify?.status || 'unknown',\n    score: hunterVerify?.score || 0,\n    is_valid: hunterVerify?.status === 'valid',\n    is_disposable: hunterVerify?.disposable || false,\n    is_webmail: hunterVerify?.webmail || domainInfo.isPersonalEmail\n  },\n  \n  // User Profile\n  user_profile: {\n    first_name: clearbitPerson?.name?.givenName || hunterVerify?.first_name || '',\n    last_name: clearbitPerson?.name?.familyName || hunterVerify?.last_name || '',\n    full_name: clearbitPerson?.name?.fullName || '',\n    title: clearbitPerson?.employment?.title || '',\n    role: clearbitPerson?.employment?.role || '',\n    seniority: clearbitPerson?.employment?.seniority || '',\n    country: country,\n    city: clearbitPerson?.geo?.city || clearbitCompany?.geo?.city || '',\n    timezone: clearbitPerson?.timeZone || '',\n    currency: mapCountryToCurrency(country),\n    avatar_url: clearbitPerson?.avatar || ''\n  },\n  \n  // Company Profile\n  company_profile: {\n    name: clearbitCompany?.name || hunterDomain?.organization || pdlCompany?.name || 'Unknown',\n    legal_name: clearbitCompany?.legalName || pdlCompany?.legal_name || '',\n    description: clearbitCompany?.description || pdlCompany?.summary || '',\n    industry: clearbitCompany?.category?.industry || pdlCompany?.industry || hunterDomain?.industry || 'Unknown',\n    sector: clearbitCompany?.category?.sector || pdlCompany?.sector || '',\n    sub_industry: clearbitCompany?.category?.subIndustry || '',\n    employee_count: clearbitCompany?.metrics?.employees || pdlCompany?.employee_count || 'Unknown',\n    employee_range: clearbitCompany?.metrics?.employeesRange || pdlCompany?.employee_count_range || 'Unknown',\n    estimated_revenue: clearbitCompany?.metrics?.estimatedAnnualRevenue || pdlCompany?.estimated_annual_revenue || 'Unknown',\n    revenue_range: clearbitCompany?.metrics?.annualRevenue || '',\n    founded_year: clearbitCompany?.foundedYear || pdlCompany?.founded || '',\n    country: clearbitCompany?.geo?.country || pdlCompany?.location?.country || country,\n    city: clearbitCompany?.geo?.city || pdlCompany?.location?.locality || '',\n    state: clearbitCompany?.geo?.state || pdlCompany?.location?.region || '',\n    address: clearbitCompany?.geo?.streetAddress || '',\n    tags: clearbitCompany?.tags || pdlCompany?.tags || [],\n    type: clearbitCompany?.type || pdlCompany?.type || ''\n  },\n  \n  // Site Profile\n  site_profile: {\n    platform: detectPlatform(technologies),\n    tech_stack: technologies.map(t => t.name || t),\n    tech_categories: [...new Set(technologies.map(t => t.categories || []).flat())],\n    cms: technologies.find(t => t.categories?.includes('CMS'))?.name || '',\n    ecommerce: technologies.find(t => t.categories?.includes('Ecommerce'))?.name || '',\n    analytics: technologies.filter(t => t.categories?.includes('Analytics')).map(t => t.name),\n    marketing_automation: technologies.filter(t => t.categories?.includes('Marketing automation')).map(t => t.name),\n    email_providers: technologies.filter(t => t.categories?.includes('Email')).map(t => t.name)\n  },\n  \n  // Traffic Estimates (from Clearbit)\n  traffic: {\n    alexa_rank: clearbitCompany?.metrics?.alexaGlobalRank || 'Unknown',\n    alexa_us_rank: clearbitCompany?.metrics?.alexaUsRank || 'Unknown',\n    estimated_traffic: clearbitCompany?.metrics?.alexaGlobalRank ? \n      (clearbitCompany.metrics.alexaGlobalRank < 10000 ? 'High' : \n       clearbitCompany.metrics.alexaGlobalRank < 100000 ? 'Medium' : \n       clearbitCompany.metrics.alexaGlobalRank < 1000000 ? 'Low' : 'Very Low') : 'Unknown'\n  },\n  \n  // Social Media Profiles\n  social_profiles: {\n    twitter: clearbitCompany?.twitter?.handle ? `https://twitter.com/${clearbitCompany.twitter.handle}` : (pdlCompany?.twitter_url || null),\n    twitter_followers: clearbitCompany?.twitter?.followers || pdlCompany?.twitter_follower_count || 0,\n    facebook: clearbitCompany?.facebook?.handle ? `https://facebook.com/${clearbitCompany.facebook.handle}` : (pdlCompany?.facebook_url || null),\n    linkedin: clearbitCompany?.linkedin?.handle ? `https://linkedin.com/company/${clearbitCompany.linkedin.handle}` : (pdlCompany?.linkedin_url || null),\n    linkedin_id: pdlCompany?.linkedin_id || '',\n    youtube: pdlCompany?.youtube_url || null,\n    crunchbase: clearbitCompany?.crunchbase?.handle ? `https://crunchbase.com/organization/${clearbitCompany.crunchbase.handle}` : null\n  },\n  \n  // Competitor Analysis\n  competitor_tools: detectCompetitorTools(technologies),\n  \n  // Domain Info from Hunter\n  domain_info: {\n    domain_type: hunterDomain?.type || 'unknown',\n    email_pattern: hunterDomain?.pattern || '',\n    headcount: hunterDomain?.headcount || '',\n    emails_found: hunterDomain?.emails?.length || 0\n  },\n  \n  // Metadata\n  enrichment_timestamp: new Date().toISOString(),\n  enrichment_sources: {\n    hunter: !!hunterDomain?.organization,\n    clearbit_person: !!clearbitPerson?.name,\n    clearbit_company: !!clearbitCompany?.name,\n    wappalyzer: technologies.length > 0,\n    pdl: !!pdlCompany?.name\n  }\n};\n\n// Calculate enrichment quality\nenrichedProfile.enrichment_quality = calculateEnrichmentQuality(enrichedProfile);\n\nreturn enrichedProfile;"
+      },
+      "id": "structure-data",
+      "name": "Structure Enriched Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an ICP (Ideal Customer Profile) scoring expert. Analyze the provided lead data and return ONLY a valid JSON response with scoring.\n\nOur ICP criteria (customize these for your business):\n- E-commerce platforms (Shopify, WooCommerce preferred) = High value\n- Employee count 10-500 = Sweet spot (1-10 = SMB, 500+ = Enterprise)\n- Monthly traffic High/Medium = Good indicator\n- Uses competitor tools (OneSignal, PushEngage, etc.) = High intent/switching potential\n- B2C retail/e-commerce industry = Best fit\n- Revenue $1M-$100M = Target range\n- Valid business email (not personal) = Better quality\n- Strong social presence = Established business\n\nScoring breakdown:\n- platform_fit (0-25): Shopify/WooCommerce = 25, WordPress = 15, Custom = 5\n- company_size_fit (0-20): 10-500 employees = 20, 1-10 = 10, 500+ = 15\n- traffic_fit (0-20): High = 20, Medium = 15, Low = 10, Unknown = 5\n- competitor_usage (0-20): Uses competitor push tools = 20, Uses marketing tools = 10\n- industry_fit (0-15): E-commerce/Retail = 15, SaaS = 12, Other B2C = 10, B2B = 5\n\nReturn ONLY valid JSON (no markdown, no explanations):\n{\n  \"icp_score\": 0-100,\n  \"icp_tier\": \"HIGH|MEDIUM|LOW\",\n  \"scoring_breakdown\": {\n    \"platform_fit\": 0-25,\n    \"company_size_fit\": 0-20,\n    \"traffic_fit\": 0-20,\n    \"competitor_usage\": 0-20,\n    \"industry_fit\": 0-15\n  },\n  \"key_insights\": [\"insight1\", \"insight2\", \"insight3\"],\n  \"pain_points\": [\"potential pain point 1\", \"potential pain point 2\"],\n  \"recommended_approach\": \"string describing best outreach strategy\",\n  \"urgency\": \"HIGH|MEDIUM|LOW\",\n  \"disqualification_reasons\": []\n}"
+            },
+            {
+              "role": "user",
+              "content": "=Analyze this lead for ICP fit:\n\n{{ JSON.stringify($json, null, 2) }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 1000
+        }
+      },
+      "id": "ai-icp-scoring",
+      "name": "AI ICP Scoring",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [1450, 400],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-creds",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the ICP analysis response\nconst enrichedData = $('Structure Enriched Data').first().json;\nlet icpAnalysis = $input.first().json;\n\n// Handle if response is a string (parse JSON)\nif (typeof icpAnalysis === 'string') {\n  try {\n    icpAnalysis = JSON.parse(icpAnalysis);\n  } catch (e) {\n    // Default fallback if parsing fails\n    icpAnalysis = {\n      icp_score: 50,\n      icp_tier: 'MEDIUM',\n      scoring_breakdown: {\n        platform_fit: 10,\n        company_size_fit: 10,\n        traffic_fit: 10,\n        competitor_usage: 10,\n        industry_fit: 10\n      },\n      key_insights: ['Unable to fully analyze lead'],\n      pain_points: [],\n      recommended_approach: 'Standard outreach approach',\n      urgency: 'MEDIUM',\n      disqualification_reasons: []\n    };\n  }\n}\n\n// Handle OpenAI response format\nif (icpAnalysis.message?.content) {\n  try {\n    icpAnalysis = JSON.parse(icpAnalysis.message.content);\n  } catch (e) {\n    // Try to extract JSON from markdown\n    const content = icpAnalysis.message.content;\n    const jsonMatch = content.match(/```json\\n?([\\s\\S]*?)\\n?```/) || content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      icpAnalysis = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    }\n  }\n}\n\nreturn {\n  ...enrichedData,\n  icp_analysis: icpAnalysis\n};"
+      },
+      "id": "parse-icp",
+      "name": "Parse ICP Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an expert sales copywriter. Create personalized outreach emails based on lead data.\n\nOur product: [YOUR PRODUCT NAME] - Web push notifications and customer engagement platform\nKey value props:\n- Increase conversions by 15-25% with targeted push notifications\n- Easy integration with all major e-commerce platforms\n- AI-powered segmentation and timing optimization\n- No coding required, 5-minute setup\n\nCreate 3 email variants:\n1. Direct value pitch (focus on immediate ROI and specific metrics)\n2. Problem-aware (acknowledge their current tools/challenges, position as solution)\n3. Social proof (case study focused, similar company success stories)\n\nEach email should:\n- Be personalized to their platform/industry (mention it naturally)\n- Reference specific data points about their business (company name, platform, etc.)\n- Include a clear CTA for a quick call or demo\n- Be under 150 words\n- Sound human and conversational, not templated\n- Use their first name if available, otherwise use a friendly greeting\n- If they use competitor tools, acknowledge the switch benefits\n\nReturn ONLY valid JSON (no markdown, no explanations):\n{\n  \"variant_1\": {\n    \"subject\": \"string (under 50 chars, personalized)\",\n    \"body\": \"string\",\n    \"approach\": \"direct_value\"\n  },\n  \"variant_2\": {\n    \"subject\": \"string (under 50 chars, curiosity-driven)\",\n    \"body\": \"string\",\n    \"approach\": \"problem_aware\"\n  },\n  \"variant_3\": {\n    \"subject\": \"string (under 50 chars, social proof)\",\n    \"body\": \"string\",\n    \"approach\": \"social_proof\"\n  },\n  \"recommended_variant\": 1,\n  \"personalization_notes\": \"string explaining why this variant was recommended\"\n}"
+            },
+            {
+              "role": "user",
+              "content": "=Create outreach emails for this lead:\n\nLead Data:\n{{ JSON.stringify($json, null, 2) }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 2000
+        }
+      },
+      "id": "ai-email-gen",
+      "name": "Generate Email Variants",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [1850, 400],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-creds",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the email generation response\nconst previousData = $('Parse ICP Analysis').first().json;\nlet emailVariants = $input.first().json;\n\n// Handle if response is a string (parse JSON)\nif (typeof emailVariants === 'string') {\n  try {\n    emailVariants = JSON.parse(emailVariants);\n  } catch (e) {\n    emailVariants = {\n      variant_1: { subject: 'Quick question about your store', body: 'Hi there,\\n\\nI noticed your e-commerce store and thought you might be interested in how other similar stores are boosting their conversions.\\n\\nWould you be open to a quick 15-min call this week?\\n\\nBest regards', approach: 'direct_value' },\n      variant_2: { subject: 'Regarding your website notifications', body: 'Hi,\\n\\nI came across your store and noticed an opportunity to improve customer engagement.\\n\\nHappy to share some insights if you have 15 minutes this week.\\n\\nCheers', approach: 'problem_aware' },\n      variant_3: { subject: 'How similar stores increased revenue', body: 'Hi,\\n\\nWanted to share how businesses like yours are seeing 20%+ conversion improvements.\\n\\nInterested in a quick case study walkthrough?\\n\\nBest', approach: 'social_proof' },\n      recommended_variant: 1,\n      personalization_notes: 'Standard outreach'\n    };\n  }\n}\n\n// Handle OpenAI response format\nif (emailVariants.message?.content) {\n  try {\n    emailVariants = JSON.parse(emailVariants.message.content);\n  } catch (e) {\n    const content = emailVariants.message.content;\n    const jsonMatch = content.match(/```json\\n?([\\s\\S]*?)\\n?```/) || content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      emailVariants = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    }\n  }\n}\n\nreturn {\n  ...previousData,\n  email_variants: emailVariants\n};"
+      },
+      "id": "parse-emails",
+      "name": "Parse Email Variants",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "high-value-check",
+              "leftValue": "={{ $json.icp_analysis.icp_tier }}",
+              "rightValue": "HIGH",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-high-value",
+      "name": "Is High Value?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2250, 400]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $credentials.googleSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Lead Outreach Tracker",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('YYYY-MM-DD HH:mm:ss') }}",
+            "Email": "={{ $json.email }}",
+            "Company": "={{ $json.company_profile.name }}",
+            "Website": "={{ $json.website_url }}",
+            "Platform": "={{ $json.site_profile.platform }}",
+            "Industry": "={{ $json.company_profile.industry }}",
+            "Employees": "={{ $json.company_profile.employee_range }}",
+            "Traffic Level": "={{ $json.traffic.estimated_traffic }}",
+            "ICP Score": "={{ $json.icp_analysis.icp_score }}",
+            "ICP Tier": "={{ $json.icp_analysis.icp_tier }}",
+            "Uses Competitor": "={{ $json.competitor_tools.uses_onesignal || $json.competitor_tools.uses_pushengage }}",
+            "Recommended Variant": "={{ $json.email_variants.recommended_variant }}",
+            "Outreach Status": "Pending",
+            "Reply Date": "",
+            "Outcome": "",
+            "Notes": "",
+            "AI Recommendation": "={{ $json.icp_analysis.recommended_approach }}",
+            "Country": "={{ $json.user_profile.country }}",
+            "User Name": "={{ $json.user_profile.full_name || $json.user_profile.first_name }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "google-sheets-all",
+      "name": "Add to Tracking Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [2450, 550],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-creds",
+          "name": "Google Sheets OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#high-value-leads",
+        "text": "",
+        "blocksUi": {
+          "blocks": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "🔥 High Value Lead Alert!",
+                "emoji": true
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*Company:* {{ $json.company_profile.name }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Email:* {{ $json.email }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*ICP Score:* {{ $json.icp_analysis.icp_score }}/100"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Platform:* {{ $json.site_profile.platform }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Employees:* {{ $json.company_profile.employee_range }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Industry:* {{ $json.company_profile.industry }}"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Key Insights:*\n• {{ $json.icp_analysis.key_insights.join('\\n• ') }}"
+              }
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Competitor Tools:* {{ $json.competitor_tools.uses_onesignal ? 'OneSignal ✓' : '' }}{{ $json.competitor_tools.uses_pushengage ? ' PushEngage ✓' : '' }}{{ (!$json.competitor_tools.uses_onesignal && !$json.competitor_tools.uses_pushengage) ? 'None detected' : '' }}"
+              }
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Recommended Approach:*\n{{ $json.icp_analysis.recommended_approach }}"
+              }
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Recommended Email Subject:*\n{{ $json.email_variants['variant_' + $json.email_variants.recommended_variant].subject }}"
+              }
+            }
+          ]
+        },
+        "otherOptions": {}
+      },
+      "id": "slack-notify-high",
+      "name": "Notify Slack - High Value",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [2450, 250],
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "slack-creds",
+          "name": "Slack OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.email_variants['variant_' + $json.email_variants.recommended_variant].subject }}",
+        "emailType": "text",
+        "message": "={{ $json.email_variants['variant_' + $json.email_variants.recommended_variant].body }}",
+        "options": {
+          "draft": true
+        }
+      },
+      "id": "gmail-draft",
+      "name": "Save as Gmail Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2650, 250],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-creds",
+          "name": "Gmail OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"lead_id\": \"{{ $('Extract Domain Info').first().json.userId }}\",\n  \"email\": \"{{ $('Extract Domain Info').first().json.email }}\",\n  \"company\": \"{{ $json.company_profile.name }}\",\n  \"icp_score\": {{ $json.icp_analysis.icp_score }},\n  \"icp_tier\": \"{{ $json.icp_analysis.icp_tier }}\",\n  \"enrichment_quality\": {{ $json.enrichment_quality }},\n  \"processed_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2850, 400]
+    },
+    {
+      "parameters": {
+        "content": "## Lead Profile Enrichment Automation\n\n### Workflow Overview\nThis workflow enriches new signup leads with data from multiple sources, scores them against your ICP, and generates personalized outreach emails.\n\n### Free/Freemium Services Used:\n- **Hunter.io** (50 free/month) - Email verification & domain search\n- **Clearbit** (free tier) - Person & company enrichment\n- **Wappalyzer** (limited free) - Tech stack detection\n- **PDL** (free tier) - Company enrichment fallback\n- **OpenAI GPT-4o-mini** (~$0.002/lead) - ICP scoring & email generation\n\n### Required Credentials:\n1. Hunter.io API Key\n2. Clearbit API Key\n3. Wappalyzer API Key (optional)\n4. PDL API Key (optional fallback)\n5. OpenAI API Key\n6. Google Sheets OAuth\n7. Gmail OAuth\n8. Slack OAuth (optional)\n\n### Webhook Payload Format:\n```json\n{\n  \"email\": \"user@company.com\",\n  \"website_url\": \"https://company.com\",\n  \"signup_plan\": \"free\",\n  \"user_id\": \"12345\",\n  \"signup_timestamp\": \"2024-01-15T10:30:00Z\"\n}\n```",
+        "height": 580,
+        "width": 360,
+        "color": 4
+      },
+      "id": "sticky-note-1",
+      "name": "Workflow Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-100, 150]
+    },
+    {
+      "parameters": {
+        "content": "## Stage 1: Trigger & Parse\nReceive webhook with lead data and extract domain information",
+        "height": 120,
+        "width": 300,
+        "color": 6
+      },
+      "id": "sticky-note-2",
+      "name": "Stage 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 280]
+    },
+    {
+      "parameters": {
+        "content": "## Stage 2: Parallel Enrichment\nFetch data from multiple APIs simultaneously",
+        "height": 120,
+        "width": 300,
+        "color": 6
+      },
+      "id": "sticky-note-3",
+      "name": "Stage 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [700, 80]
+    },
+    {
+      "parameters": {
+        "content": "## Stage 3: Merge & Structure\nCombine all enrichment data into unified profile",
+        "height": 100,
+        "width": 300,
+        "color": 6
+      },
+      "id": "sticky-note-4",
+      "name": "Stage 3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1100, 380]
+    },
+    {
+      "parameters": {
+        "content": "## Stage 4: AI Processing\nICP scoring and personalized email generation",
+        "height": 100,
+        "width": 500,
+        "color": 6
+      },
+      "id": "sticky-note-5",
+      "name": "Stage 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1400, 280]
+    },
+    {
+      "parameters": {
+        "content": "## Stage 5: Output Actions\nStore results, notify team, create email drafts",
+        "height": 100,
+        "width": 500,
+        "color": 6
+      },
+      "id": "sticky-note-6",
+      "name": "Stage 5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2300, 130]
+    }
+  ],
+  "connections": {
+    "New Signup Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Domain Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Domain Info": {
+      "main": [
+        [
+          {
+            "node": "Parallel Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parallel Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Hunter.io Domain Search",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Hunter.io Email Verify",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Clearbit Person Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Clearbit Company Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wappalyzer Tech Stack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PDL Company Enrich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hunter.io Domain Search": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hunter.io Email Verify": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clearbit Person Lookup": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clearbit Company Lookup": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wappalyzer Tech Stack": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDL Company Enrich": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Enrichment Data": {
+      "main": [
+        [
+          {
+            "node": "Structure Enriched Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure Enriched Data": {
+      "main": [
+        [
+          {
+            "node": "AI ICP Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI ICP Scoring": {
+      "main": [
+        [
+          {
+            "node": "Parse ICP Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse ICP Analysis": {
+      "main": [
+        [
+          {
+            "node": "Generate Email Variants",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email Variants": {
+      "main": [
+        [
+          {
+            "node": "Parse Email Variants",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Email Variants": {
+      "main": [
+        [
+          {
+            "node": "Is High Value?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is High Value?": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack - High Value",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save as Gmail Draft",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add to Tracking Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add to Tracking Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Slack - High Value": {
+      "main": [
+        []
+      ]
+    },
+    "Save as Gmail Draft": {
+      "main": [
+        []
+      ]
+    },
+    "Add to Tracking Sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "lead-enrichment-instance"
+  },
+  "pinData": {},
+  "versionId": "1.0.0",
+  "triggerCount": 1,
+  "tags": [
+    {
+      "id": "1",
+      "name": "Lead Enrichment"
+    },
+    {
+      "id": "2",
+      "name": "Sales Automation"
+    }
+  ]
+}

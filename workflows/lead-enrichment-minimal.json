@@ -1,0 +1,275 @@
+{
+  "name": "Lead Enrichment - Minimal Setup",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-enrichment-test",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "New Signup Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "lead-enrichment-test-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and validate input data\nconst input = $input.first().json;\n\nconst email = input.email || '';\nconst websiteUrl = input.website_url || '';\nconst signupPlan = input.signup_plan || 'free';\nconst userId = input.user_id || `lead_${Date.now()}`;\n\n// Extract domain from email\nconst emailDomain = email.split('@')[1] || '';\n\n// Extract domain from website URL\nlet websiteDomain = '';\ntry {\n  const url = new URL(websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`);\n  websiteDomain = url.hostname.replace('www.', '');\n} catch (e) {\n  websiteDomain = websiteUrl.replace(/^(https?:\\/\\/)?(www\\.)?/, '').split('/')[0];\n}\n\n// Check if personal email\nconst personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'aol.com', 'protonmail.com'];\nconst isPersonalEmail = personalDomains.includes(emailDomain.toLowerCase());\n\nreturn {\n  email,\n  emailDomain,\n  websiteUrl,\n  websiteDomain,\n  companyDomain: isPersonalEmail ? websiteDomain : emailDomain,\n  isPersonalEmail,\n  signupPlan,\n  userId,\n  signupTimestamp: new Date().toISOString()\n};"
+      },
+      "id": "extract-domain",
+      "name": "Extract Domain Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.hunter.io/v2/domain-search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $json.companyDomain }}"
+            },
+            {
+              "name": "api_key",
+              "value": "={{ $credentials.hunterApiKey || 'HUNTER_API_KEY_HERE' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "hunter-lookup",
+      "name": "Hunter.io Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine basic info with Hunter data\nconst domainInfo = $('Extract Domain Info').first().json;\nconst hunterData = $input.first()?.json?.data || {};\n\n// Build basic profile\nconst profile = {\n  // Input data\n  email: domainInfo.email,\n  website_url: domainInfo.websiteUrl,\n  company_domain: domainInfo.companyDomain,\n  signup_plan: domainInfo.signupPlan,\n  user_id: domainInfo.userId,\n  is_personal_email: domainInfo.isPersonalEmail,\n  \n  // Company info from Hunter\n  company_name: hunterData.organization || 'Unknown',\n  industry: hunterData.industry || 'Unknown',\n  country: hunterData.country || 'Unknown',\n  company_type: hunterData.type || 'Unknown',\n  \n  // Additional Hunter data\n  email_pattern: hunterData.pattern || '',\n  emails_found: hunterData.emails?.length || 0,\n  \n  // Metadata\n  enrichment_timestamp: new Date().toISOString(),\n  enrichment_source: hunterData.organization ? 'hunter.io' : 'none'\n};\n\nreturn profile;"
+      },
+      "id": "build-profile",
+      "name": "Build Lead Profile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an ICP scoring and sales email expert. Analyze the lead and:\n\n1. Score them 0-100 based on:\n   - Business email vs personal (business = higher)\n   - Company identified vs unknown (identified = higher)\n   - Industry relevance for a B2B SaaS product\n\n2. Generate a personalized outreach email (under 100 words)\n\nReturn ONLY this JSON:\n{\n  \"icp_score\": 0-100,\n  \"icp_tier\": \"HIGH|MEDIUM|LOW\",\n  \"reasoning\": \"brief explanation\",\n  \"email_subject\": \"personalized subject line\",\n  \"email_body\": \"personalized email body\"\n}"
+            },
+            {
+              "role": "user",
+              "content": "=Analyze this lead:\n{{ JSON.stringify($json, null, 2) }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.5,
+          "maxTokens": 800
+        }
+      },
+      "id": "ai-analysis",
+      "name": "AI Analysis & Email",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [1000, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-creds",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine profile with AI analysis\nconst profile = $('Build Lead Profile').first().json;\nlet aiResult = $input.first().json;\n\n// Parse AI response\nif (aiResult.message?.content) {\n  try {\n    aiResult = JSON.parse(aiResult.message.content);\n  } catch (e) {\n    // Try to extract JSON\n    const content = aiResult.message.content;\n    const match = content.match(/\\{[\\s\\S]*\\}/);\n    if (match) {\n      aiResult = JSON.parse(match[0]);\n    } else {\n      aiResult = {\n        icp_score: 50,\n        icp_tier: 'MEDIUM',\n        reasoning: 'Could not analyze',\n        email_subject: 'Quick question',\n        email_body: 'Hi, I noticed your company and wanted to connect.'\n      };\n    }\n  }\n}\n\nreturn {\n  ...profile,\n  icp_score: aiResult.icp_score || 50,\n  icp_tier: aiResult.icp_tier || 'MEDIUM',\n  icp_reasoning: aiResult.reasoning || '',\n  email_subject: aiResult.email_subject || '',\n  email_body: aiResult.email_body || ''\n};"
+      },
+      "id": "combine-results",
+      "name": "Combine Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('YYYY-MM-DD HH:mm:ss') }}",
+            "Email": "={{ $json.email }}",
+            "Company": "={{ $json.company_name }}",
+            "Website": "={{ $json.website_url }}",
+            "Industry": "={{ $json.industry }}",
+            "Country": "={{ $json.country }}",
+            "ICP Score": "={{ $json.icp_score }}",
+            "ICP Tier": "={{ $json.icp_tier }}",
+            "Email Subject": "={{ $json.email_subject }}",
+            "Status": "Pending"
+          }
+        },
+        "options": {}
+      },
+      "id": "save-to-sheets",
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1400, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-creds",
+          "name": "Google Sheets OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"lead_id\": \"{{ $json.user_id }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"company\": \"{{ $json.company_name }}\",\n  \"icp_score\": {{ $json.icp_score }},\n  \"icp_tier\": \"{{ $json.icp_tier }}\",\n  \"email_subject\": \"{{ $json.email_subject }}\",\n  \"processed_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1600, 300]
+    },
+    {
+      "parameters": {
+        "content": "## Minimal Setup Workflow\n\nThis simplified workflow requires only:\n1. **Hunter.io API** (free 50/month) - for company lookup\n2. **OpenAI API** - for scoring and email generation\n3. **Google Sheets** - for tracking\n\n### Setup Steps:\n1. Add OpenAI credential\n2. Add Google Sheets OAuth credential\n3. Create a Google Sheet with columns:\n   - Timestamp, Email, Company, Website, Industry, Country, ICP Score, ICP Tier, Email Subject, Status\n4. Update the spreadsheet ID in 'Save to Google Sheets' node\n5. Optionally add Hunter.io API key\n6. Activate workflow\n\n### Test:\n```\ncurl -X POST http://localhost:5678/webhook/lead-enrichment-test \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"email\": \"test@company.com\", \"website_url\": \"https://company.com\"}'\n```",
+        "height": 420,
+        "width": 400,
+        "color": 4
+      },
+      "id": "sticky-note",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [150, -150]
+    }
+  ],
+  "connections": {
+    "New Signup Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Domain Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Domain Info": {
+      "main": [
+        [
+          {
+            "node": "Hunter.io Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hunter.io Lookup": {
+      "main": [
+        [
+          {
+            "node": "Build Lead Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Lead Profile": {
+      "main": [
+        [
+          {
+            "node": "AI Analysis & Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Analysis & Email": {
+      "main": [
+        [
+          {
+            "node": "Combine Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Results": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "versionId": "1.0.0-minimal",
+  "triggerCount": 1,
+  "tags": [
+    {
+      "id": "1",
+      "name": "Lead Enrichment"
+    },
+    {
+      "id": "2",
+      "name": "Minimal Setup"
+    }
+  ]
+}
