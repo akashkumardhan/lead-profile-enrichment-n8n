@@ -8,29 +8,41 @@ services:
     ports:
       - "5678:5678"
     environment:
+      - N8N_LOG_LEVEL=debug
+
       # Database configuration
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=n8n
       - DB_POSTGRESDB_USER=n8n
-      - DB_POSTGRESDB_PASSWORD=n8n_password
+      - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD:-n8n_password}
 
-      # n8n configuration
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD=changeme123
-      - N8N_HOST=localhost
+      # n8n configuration (user management)
+      - N8N_USER_MANAGEMENT_DISABLED=false
+      - N8N_DEFAULT_USER_EMAIL=${N8N_DEFAULT_USER_EMAIL:-admin@localhost.com}
+      - N8N_DEFAULT_USER_PASSWORD=${N8N_DEFAULT_USER_PASSWORD:-changeme123}
+      - N8N_HOST=${N8N_HOST:-localhost}
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://localhost:5678/
-      - GENERIC_TIMEZONE=UTC
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678/}
+      - GENERIC_TIMEZONE=${TIMEZONE:-UTC}
 
       # Encryption key for credentials (generate your own for production)
-      - N8N_ENCRYPTION_KEY=your-encryption-key-change-this
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-your-encryption-key-change-this}
 
       # Enable community nodes
       - N8N_COMMUNITY_PACKAGES_ENABLED=true
+
+      # API Keys for Enrichment Services (accessible via $env in workflows)
+      - HUNTER_API_KEY=${HUNTER_API_KEY}
+      - CLEARBIT_API_KEY=${CLEARBIT_API_KEY}
+      - WAPPALYZER_API_KEY=${WAPPALYZER_API_KEY}
+      - PDL_API_KEY=${PDL_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+
+      # Google Services
+      - GOOGLE_SHEET_ID=${GOOGLE_SHEET_ID}
 
     volumes:
       - n8n_data:/home/node/.n8n
@@ -47,7 +59,7 @@ services:
     restart: unless-stopped
     environment:
       - POSTGRES_USER=n8n
-      - POSTGRES_PASSWORD=n8n_password
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-n8n_password}
       - POSTGRES_DB=n8n
     volumes:
       - postgres_data:/var/lib/postgresql/data

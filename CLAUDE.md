@@ -4,7 +4,7 @@
 
 Build an n8n automation workflow that enriches new signup leads, classifies them against ICP (Ideal Customer Profile), and enables personalized 1:1 onboarding outreach.
 
-**Input Data:** Email Address + Website URL (from signup)
+**Input Data:** Email Address + Website URLs(from signup)
 
 ---
 

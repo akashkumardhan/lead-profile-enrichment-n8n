@@ -46,7 +46,7 @@
             },
             {
               "name": "api_key",
-              "value": "={{ $credentials.hunterApiKey }}"
+              "value": "={{ $env.HUNTER_API_KEY }}"
             }
           ]
         },
@@ -59,13 +59,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [800, 200],
-      "continueOnFail": true,
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "hunter-auth",
-          "name": "Hunter API"
-        }
-      }
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -80,7 +74,7 @@
             },
             {
               "name": "api_key",
-              "value": "={{ $credentials.hunterApiKey }}"
+              "value": "={{ $env.HUNTER_API_KEY }}"
             }
           ]
         },
@@ -113,7 +107,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer {{ $credentials.clearbitApiKey }}"
+              "value": "Bearer {{ $env.CLEARBIT_API_KEY }}"
             }
           ]
         },
@@ -146,7 +140,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer {{ $credentials.clearbitApiKey }}"
+              "value": "Bearer {{ $env.CLEARBIT_API_KEY }}"
             }
           ]
         },
@@ -179,7 +173,7 @@
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "={{ $credentials.wappalyzerApiKey }}"
+              "value": "={{ $env.WAPPALYZER_API_KEY }}"
             }
           ]
         },
@@ -207,7 +201,7 @@
             },
             {
               "name": "api_key",
-              "value": "={{ $credentials.pdlApiKey }}"
+              "value": "={{ $env.PDL_API_KEY }}"
             }
           ]
         },
@@ -249,7 +243,7 @@
     },
     {
       "parameters": {
-        "model": "gpt-4o-mini",
+        "model": "gemini-1.5-flash",
         "messages": {
           "values": [
             {
@@ -270,13 +264,13 @@
       },
       "id": "ai-icp-scoring",
       "name": "AI ICP Scoring",
-      "type": "@n8n/n8n-nodes-langchain.openAi",
-      "typeVersion": 1.4,
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.0,
       "position": [1450, 400],
       "credentials": {
-        "openAiApi": {
-          "id": "openai-creds",
-          "name": "OpenAI API"
+        "googleGeminiApi": {
+          "id": "gemini-api-key",
+          "name": "Google Gemini API Key"
         }
       }
     },
@@ -292,7 +286,7 @@
     },
     {
       "parameters": {
-        "model": "gpt-4o-mini",
+        "model": "gemini-1.5-flash",
         "messages": {
           "values": [
             {
@@ -313,13 +307,13 @@
       },
       "id": "ai-email-gen",
       "name": "Generate Email Variants",
-      "type": "@n8n/n8n-nodes-langchain.openAi",
-      "typeVersion": 1.4,
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.0,
       "position": [1850, 400],
       "credentials": {
-        "openAiApi": {
-          "id": "openai-creds",
-          "name": "OpenAI API"
+        "googleGeminiApi": {
+          "id": "gemini-api-key",
+          "name": "Google Gemini API Key"
         }
       }
     },
@@ -366,7 +360,7 @@
       "parameters": {
         "documentId": {
           "__rl": true,
-          "value": "={{ $credentials.googleSheetId }}",
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
           "mode": "id"
         },
         "sheetName": {
