@@ -123,7 +123,7 @@ value: YOUR_PDL_API_KEY
 ```
 
 ### Endpoint Used
-- Company Enrich: `https://api.pdl.com/v5/company/enrich?website=DOMAIN&api_key=KEY`
+- Company Enrich: `https://api.peopledatalabs.com/v5/company/enrich?website=DOMAIN&api_key=KEY`
 
 ---
 
