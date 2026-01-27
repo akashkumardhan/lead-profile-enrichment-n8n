@@ -36,8 +36,7 @@ services:
 
       # API Keys for Enrichment Services (accessible via $env in workflows)
       - HUNTER_API_KEY=${HUNTER_API_KEY}
-      - CLEARBIT_API_KEY=${CLEARBIT_API_KEY}
-      - WAPPALYZER_API_KEY=${WAPPALYZER_API_KEY}
+      - APOLLO_API_KEY=${APOLLO_API_KEY}
       - PDL_API_KEY=${PDL_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
 

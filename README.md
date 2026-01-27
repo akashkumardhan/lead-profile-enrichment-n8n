@@ -5,10 +5,11 @@ Automatically enrich new signup leads, score them against your ICP, and generate
 ## Features
 
 ✅ **Environment-based API keys** - No manual UI configuration for most services
-✅ **Multi-source enrichment** - Hunter.io, Clearbit, Wappalyzer, PDL
+✅ **Multi-source enrichment** - Hunter.io, Apollo.io, PDL + HTML scraping
 ✅ **AI-powered ICP scoring** - Using Google Gemini (free tier available)
 ✅ **Personalized emails** - 3 variants per lead
 ✅ **Automated workflows** - Slack, Gmail, Google Sheets integration
+✅ **Free tech stack detection** - HTML pattern-based platform & competitor detection
 
 ## Quick Start
 
@@ -28,8 +29,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 # Enrichment Services
 HUNTER_API_KEY=your_hunter_api_key_here
-CLEARBIT_API_KEY=your_clearbit_api_key_here
-WAPPALYZER_API_KEY=your_wappalyzer_api_key_here  # Optional
+APOLLO_API_KEY=your_apollo_api_key_here
 PDL_API_KEY=your_pdl_api_key_here  # Optional
 
 # Google Services
@@ -45,9 +45,8 @@ DB_PASSWORD=your_database_password
 **Get API Keys:**
 - **Gemini**: https://makersuite.google.com/app/apikey (Free: 60 req/min)
 - **Hunter.io**: https://hunter.io (Free: 50/month)
-- **Clearbit**: https://clearbit.com (Free tier available)
-- **Wappalyzer**: https://www.wappalyzer.com/api (Optional)
-- **PDL**: https://www.peopledatalabs.com (Optional)
+- **Apollo.io**: https://www.apollo.io (Free: 60 credits/month)
+- **PDL**: https://www.peopledatalabs.com (Optional - fallback enrichment)
 
 ### 2. Start n8n
 
@@ -170,8 +169,8 @@ environment:
 |---------|-----------|---------|
 | Google Gemini | 60 req/min | ICP scoring, email generation |
 | Hunter.io | 50/month | Email verification, domain search |
-| Clearbit | Limited | Person & company enrichment |
-| Wappalyzer | Limited | Tech stack detection |
+| Apollo.io | 60 credits/month | Person & company enrichment |
+| HTML Scraping | Unlimited | Tech stack & platform detection |
 | PDL | 100 credits | Company enrichment fallback |
 
 ## Files Structure
@@ -266,21 +265,24 @@ See [docs/troubleshooting.md](docs/troubleshooting.md) for more solutions.
 ## Cost Estimate
 
 **Free Tier (50 leads/month):**
-- Hunter.io: Free
+- Hunter.io: Free (50/month)
+- Apollo.io: Free (60 credits/month)
+- HTML Scraping: Free (unlimited)
 - Gemini: Free
 - **Total: $0/month**
 
 **Paid Tier (500 leads/month):**
 - Hunter.io: $49/month
-- Clearbit: $99/month
+- Apollo.io: $49/month
+- HTML Scraping: Free
 - Gemini: Free
-- **Total: ~$150/month**
+- **Total: ~$100/month**
 
-| Volume | Hunter.io | Clearbit | Gemini | Total/month |
-|--------|-----------|----------|--------|-------------|
-| 50 leads | Free | Free tier | Free | $0 |
-| 500 leads | $49 | $99 | Free | ~$150 |
-| 2000 leads | $99 | $99+ | Free | ~$200+ |
+| Volume | Hunter.io | Apollo.io | HTML Scraping | Gemini | Total/month |
+|--------|-----------|-----------|---------------|--------|-------------|
+| 50 leads | Free | Free | Free | Free | $0 |
+| 500 leads | $49 | $49 | Free | Free | ~$100 |
+| 2000 leads | $99 | $99 | Free | Free | ~$200 |
 
 ## License
 
