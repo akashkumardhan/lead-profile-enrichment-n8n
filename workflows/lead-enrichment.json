@@ -233,7 +233,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse the ICP analysis response\nconst enrichedData = $('Structure Enriched Data').first().json;\nlet icpAnalysis = $input.first().json;\n\n// Handle if response is a string (parse JSON)\nif (typeof icpAnalysis === 'string') {\n  try {\n    icpAnalysis = JSON.parse(icpAnalysis);\n  } catch (e) {\n    // Default fallback if parsing fails\n    icpAnalysis = {\n      icp_score: 50,\n      icp_tier: 'MEDIUM',\n      scoring_breakdown: {\n        platform_fit: 10,\n        company_size_fit: 10,\n        traffic_fit: 10,\n        competitor_usage: 10,\n        industry_fit: 10\n      },\n      key_insights: ['Unable to fully analyze lead'],\n      pain_points: [],\n      recommended_approach: 'Standard outreach approach',\n      urgency: 'MEDIUM',\n      disqualification_reasons: []\n    };\n  }\n}\n\n// Handle OpenAI response format\nif (icpAnalysis.message?.content) {\n  try {\n    icpAnalysis = JSON.parse(icpAnalysis.message.content);\n  } catch (e) {\n    // Try to extract JSON from markdown\n    const content = icpAnalysis.message.content;\n    const jsonMatch = content.match(/```json\\n?([\\s\\S]*?)\\n?```/) || content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      icpAnalysis = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    }\n  }\n}\n\nreturn [{\n  json: {\n    ...enrichedData,\n    icp_analysis: icpAnalysis\n  }\n}];"
+        "jsCode": "// Parse the ICP analysis response\nconst enrichedData = $('Structure Enriched Data').first().json;\nlet icpAnalysis = $input.first().json;\n\n// Default fallback\nconst defaultIcp = {\n  icp_score: 50,\n  icp_tier: 'MEDIUM',\n  scoring_breakdown: {\n    platform_fit: 10,\n    company_size_fit: 10,\n    traffic_fit: 10,\n    competitor_usage: 10,\n    industry_fit: 10\n  },\n  key_insights: ['Unable to fully analyze lead'],\n  pain_points: [],\n  recommended_approach: 'Standard outreach approach',\n  urgency: 'MEDIUM',\n  disqualification_reasons: []\n};\n\ntry {\n  // Handle if response is a string\n  if (typeof icpAnalysis === 'string') {\n    icpAnalysis = JSON.parse(icpAnalysis);\n  }\n\n  // Handle Gemini response format: { content: { parts: [{ text: '...' }] } }\n  if (icpAnalysis.content?.parts?.[0]?.text) {\n    const textContent = icpAnalysis.content.parts[0].text;\n    // Try to extract JSON from the text (might be wrapped in markdown)\n    const jsonMatch = textContent.match(/```json\\n?([\\s\\S]*?)\\n?```/);\n    if (jsonMatch) {\n      icpAnalysis = JSON.parse(jsonMatch[1]);\n    } else {\n      icpAnalysis = JSON.parse(textContent);\n    }\n  }\n  // Handle OpenAI response format\n  else if (icpAnalysis.message?.content) {\n    const content = icpAnalysis.message.content;\n    const jsonMatch = content.match(/```json\\n?([\\s\\S]*?)\\n?```/) || content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      icpAnalysis = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    } else {\n      icpAnalysis = JSON.parse(content);\n    }\n  }\n  // Handle direct text response\n  else if (icpAnalysis.text) {\n    icpAnalysis = JSON.parse(icpAnalysis.text);\n  }\n} catch (e) {\n  console.log('ICP parsing error:', e.message);\n  icpAnalysis = defaultIcp;\n}\n\n// Validate required fields exist\nif (!icpAnalysis.icp_score || !icpAnalysis.icp_tier) {\n  icpAnalysis = { ...defaultIcp, ...icpAnalysis };\n}\n\nreturn [{\n  json: {\n    ...enrichedData,\n    icp_analysis: icpAnalysis\n  }\n}];"
       },
       "id": "parse-icp",
       "name": "Parse ICP Analysis",
@@ -270,7 +270,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse the email generation response\nconst previousData = $('Parse ICP Analysis').first().json;\nlet emailVariants = $input.first().json;\n\n// Handle if response is a string (parse JSON)\nif (typeof emailVariants === 'string') {\n  try {\n    emailVariants = JSON.parse(emailVariants);\n  } catch (e) {\n    emailVariants = {\n      variant_1: { subject: 'Quick question about your store', body: 'Hi there,\\n\\nI noticed your e-commerce store and thought you might be interested in how other similar stores are boosting their conversions.\\n\\nWould you be open to a quick 15-min call this week?\\n\\nBest regards', approach: 'direct_value' },\n      variant_2: { subject: 'Regarding your website notifications', body: 'Hi,\\n\\nI came across your store and noticed an opportunity to improve customer engagement.\\n\\nHappy to share some insights if you have 15 minutes this week.\\n\\nCheers', approach: 'problem_aware' },\n      variant_3: { subject: 'How similar stores increased revenue', body: 'Hi,\\n\\nWanted to share how businesses like yours are seeing 20%+ conversion improvements.\\n\\nInterested in a quick case study walkthrough?\\n\\nBest', approach: 'social_proof' },\n      recommended_variant: 1,\n      personalization_notes: 'Standard outreach'\n    };\n  }\n}\n\n// Handle OpenAI response format\nif (emailVariants.message?.content) {\n  try {\n    emailVariants = JSON.parse(emailVariants.message.content);\n  } catch (e) {\n    const content = emailVariants.message.content;\n    const jsonMatch = content.match(/```json\\n?([\\s\\S]*?)\\n?```/) || content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      emailVariants = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    }\n  }\n}\n\nreturn [{\n  json: {\n    ...previousData,\n    email_variants: emailVariants\n  }\n}];"
+        "jsCode": "// Parse the email generation response\nconst previousData = $('Parse ICP Analysis').first().json;\nlet emailVariants = $input.first().json;\n\n// Default fallback\nconst defaultEmails = {\n  variant_1: { subject: 'Quick question about your store', body: 'Hi there,\\n\\nI noticed your e-commerce store and thought you might be interested in how other similar stores are boosting their conversions.\\n\\nWould you be open to a quick 15-min call this week?\\n\\nBest regards', approach: 'direct_value' },\n  variant_2: { subject: 'Regarding your website notifications', body: 'Hi,\\n\\nI came across your store and noticed an opportunity to improve customer engagement.\\n\\nHappy to share some insights if you have 15 minutes this week.\\n\\nCheers', approach: 'problem_aware' },\n  variant_3: { subject: 'How similar stores increased revenue', body: 'Hi,\\n\\nWanted to share how businesses like yours are seeing 20%+ conversion improvements.\\n\\nInterested in a quick case study walkthrough?\\n\\nBest', approach: 'social_proof' },\n  recommended_variant: 1,\n  personalization_notes: 'Standard outreach'\n};\n\ntry {\n  // Handle if response is a string\n  if (typeof emailVariants === 'string') {\n    emailVariants = JSON.parse(emailVariants);\n  }\n\n  // Handle Gemini response format: { content: { parts: [{ text: '...' }] } }\n  if (emailVariants.content?.parts?.[0]?.text) {\n    const textContent = emailVariants.content.parts[0].text;\n    // Try to extract JSON from the text (might be wrapped in markdown)\n    const jsonMatch = textContent.match(/```json\\n?([\\s\\S]*?)\\n?```/);\n    if (jsonMatch) {\n      emailVariants = JSON.parse(jsonMatch[1]);\n    } else {\n      emailVariants = JSON.parse(textContent);\n    }\n  }\n  // Handle OpenAI response format\n  else if (emailVariants.message?.content) {\n    const content = emailVariants.message.content;\n    const jsonMatch = content.match(/```json\\n?([\\s\\S]*?)\\n?```/) || content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      emailVariants = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    } else {\n      emailVariants = JSON.parse(content);\n    }\n  }\n  // Handle direct text response\n  else if (emailVariants.text) {\n    emailVariants = JSON.parse(emailVariants.text);\n  }\n} catch (e) {\n  console.log('Email parsing error:', e.message);\n  emailVariants = defaultEmails;\n}\n\n// Validate required fields exist\nif (!emailVariants.variant_1 || !emailVariants.recommended_variant) {\n  emailVariants = { ...defaultEmails, ...emailVariants };\n}\n\nreturn [{\n  json: {\n    ...previousData,\n    email_variants: emailVariants\n  }\n}];"
       },
       "id": "parse-emails",
       "name": "Parse Email Variants",
@@ -309,15 +309,16 @@
     },
     {
       "parameters": {
+        "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "={{ $env.GOOGLE_SHEET_ID }}",
-          "mode": "id"
+          "value": "https://docs.google.com/spreadsheets/d/1xXhtRU4FpgGncRb4mnxKf7AdNHcrdZuyMfu2BkwQcww/edit?gid=1151516460#gid=1151516460",
+          "mode": "url"
         },
         "sheetName": {
           "__rl": true,
-          "value": "Lead Outreach Tracker",
-          "mode": "name"
+          "value": 1151516460,
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -341,10 +342,40 @@
             "Notes": "",
             "AI Recommendation": "={{ $json.icp_analysis.recommended_approach }}",
             "Country": "={{ $json.user_profile.country }}",
-            "User Name": "={{ $json.user_profile.full_name || $json.user_profile.first_name }}"
-          }
+            "User Name": "={{ $json.user_profile.full_name || $json.user_profile.first_name }}",
+            "Email Subject": "={{ $json.email_variants['variant_' + $json.email_variants.recommended_variant]?.subject || '' }}",
+            "Email Body": "={{ $json.email_variants['variant_' + $json.email_variants.recommended_variant]?.body || '' }}",
+            "Personalization Notes": "={{ $json.email_variants.personalization_notes || '' }}"
+          },
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Email", "displayName": "Email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Company", "displayName": "Company", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Website", "displayName": "Website", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Platform", "displayName": "Platform", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Industry", "displayName": "Industry", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Employees", "displayName": "Employees", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Traffic Level", "displayName": "Traffic Level", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "ICP Score", "displayName": "ICP Score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "ICP Tier", "displayName": "ICP Tier", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Uses Competitor", "displayName": "Uses Competitor", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Competitor Detected", "displayName": "Competitor Detected", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Recommended Variant", "displayName": "Recommended Variant", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Outreach Status", "displayName": "Outreach Status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Reply Date", "displayName": "Reply Date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Outcome", "displayName": "Outcome", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Notes", "displayName": "Notes", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "AI Recommendation", "displayName": "AI Recommendation", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Country", "displayName": "Country", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "User Name", "displayName": "User Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Email Subject", "displayName": "Email Subject", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Email Body", "displayName": "Email Body", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Personalization Notes", "displayName": "Personalization Notes", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true}
+          ]
         },
-        "options": {}
+        "options": {
+          "handlingExtraData": "insertInNewColumn"
+        }
       },
       "id": "google-sheets-all",
       "name": "Add to Tracking Sheet",
