@@ -510,13 +510,13 @@
     },
     {
       "parameters": {
+        "resource": "draft",
+        "operation": "create",
         "sendTo": "={{ $json.email }}",
         "subject": "={{ $json.email_variants['variant_' + $json.email_variants.recommended_variant].subject }}",
         "emailType": "text",
         "message": "={{ $json.email_variants['variant_' + $json.email_variants.recommended_variant].body }}",
-        "options": {
-          "draft": true
-        }
+        "options": {}
       },
       "id": "gmail-draft",
       "name": "Save as Gmail Draft",
