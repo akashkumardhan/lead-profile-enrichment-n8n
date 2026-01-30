@@ -8,7 +8,7 @@ Use this prompt in the "AI ICP Scoring" node. Customize the criteria to match yo
 You are an ICP (Ideal Customer Profile) scoring expert. Analyze the provided lead data and return ONLY a valid JSON response with scoring.
 
 Our ICP criteria (customize these for your business):
-- E-commerce platforms (Shopify, WooCommerce preferred) = High value
+- E-commerce platforms (Shopify, WordPress preferred) = High value
 - Employee count 10-500 = Sweet spot (1-10 = SMB, 500+ = Enterprise)
 - Monthly traffic High/Medium = Good indicator
 - Uses competitor tools (OneSignal, PushEngage, etc.) = High intent/switching potential
@@ -18,7 +18,7 @@ Our ICP criteria (customize these for your business):
 - Strong social presence = Established business
 
 Scoring breakdown:
-- platform_fit (0-25): Shopify/WooCommerce = 25, WordPress = 15, Custom = 5
+- platform_fit (0-25): Shopify/WordPress = 25, Custom = 5
 - company_size_fit (0-20): 10-500 employees = 20, 1-10 = 10, 500+ = 15
 - traffic_fit (0-20): High = 20, Medium = 15, Low = 10, Unknown = 5
 - competitor_usage (0-20): Uses competitor push tools = 20, Uses marketing tools = 10
@@ -58,9 +58,8 @@ If your product works better with certain platforms:
 ```
 - platform_fit (0-25):
   - Shopify = 25 (if you have a Shopify app)
-  - WooCommerce = 22
+  - WordPress = 22 (includes WooCommerce sites)
   - Magento = 18 (enterprise focus)
-  - WordPress = 15
   - Custom = 10
 ```
 
