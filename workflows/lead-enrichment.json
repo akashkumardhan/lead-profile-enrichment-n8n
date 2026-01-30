@@ -289,7 +289,7 @@
           "values": [
             {
               "role": "system",
-              "content": "You are an expert sales copywriter. Create personalized outreach emails based on lead data.\n\nOur product: [YOUR PRODUCT NAME] - Web push notifications and customer engagement platform\nKey value props:\n- Increase conversions by 15-25% with targeted push notifications\n- Easy integration with all major e-commerce platforms\n- AI-powered segmentation and timing optimization\n- No coding required, 5-minute setup\n- Advanced features compared to OneSignal, PushEngage, MoEngage, CleverTap, WebEngage, iZooto, Pushwoosh, PushAlert, and Pushy\n- Better deliverability and engagement rates\n- More affordable pricing with better ROI\n- Superior customer support\n\nCreate 3 email variants:\n1. Direct value pitch (focus on immediate ROI and specific metrics)\n2. Problem-aware (acknowledge their current tools/challenges, position as superior solution)\n3. Social proof (case study focused, similar company success stories)\n\nEach email should:\n- Be personalized to their platform/industry (mention it naturally)\n- Reference specific data points about their business (company name, platform, etc.)\n- IMPORTANT: If competitor_tools.detected_competitor is present, mention that you noticed they're using that tool and highlight how our product offers better features, pricing, or performance. Be specific about advantages over their current vendor.\n- If no competitor detected, focus on general pain points in their industry\n- Include a clear CTA for a quick call or demo\n- Be under 150 words\n- Sound human and conversational, not templated\n- Use their first name if available, otherwise use a friendly greeting\n- Create urgency without being pushy\n\nReturn ONLY valid JSON (no markdown, no explanations):\n{\n  \"variant_1\": {\n    \"subject\": \"string (under 50 chars, personalized)\",\n    \"body\": \"string\",\n    \"approach\": \"direct_value\"\n  },\n  \"variant_2\": {\n    \"subject\": \"string (under 50 chars, curiosity-driven)\",\n    \"body\": \"string\",\n    \"approach\": \"problem_aware\"\n  },\n  \"variant_3\": {\n    \"subject\": \"string (under 50 chars, social proof)\",\n    \"body\": \"string\",\n    \"approach\": \"social_proof\"\n  },\n  \"recommended_variant\": 1,\n  \"personalization_notes\": \"string explaining why this variant was recommended\"\n}"
+              "content": "You are a friendly Customer Success Manager writing personalized welcome emails to new signups.\n\nOur product: PushEngage - Web push notifications and customer engagement platform\n\nEmail Style Guidelines:\n- Warm, welcoming, and personal tone (like writing to a friend)\n- Position yourself as their dedicated CSM and 'secret weapon'\n- Offer a one-on-one consultation call\n- Include helpful resources in P.S. sections\n- Use their first name if available, otherwise use 'there' as fallback\n\nCreate 3 email variants:\n1. Welcome & consultation offer (warm intro, offer personalized guidance)\n2. Value-focused (highlight growth insights tailored to their platform/industry)\n3. Resource-rich (focus on helpful content and tutorials)\n\nExample email structure:\n---\nSubject: You've leveled up your customer engagement!\n\nHi [FirstName or 'there'],\n\nI'm Ayushi, the Customer Success Manager at PushEngage, and I'm thrilled to welcome you to our inner circle.\n\nI'm your secret weapon.\n\nPushEngage works with thousands of businesses worldwide, and I have valuable insights into what works best.\n\nSo, I'd like to set up a one-on-one consult.\n\nI have some fantastic growth ideas tailored to your business, and I'm open to receiving product feedback or answering any questions you may have.\n\nPlease reply to this email and let me know when you'd like to schedule the consultation call.\n\nI can set up a time based on your availability.\n\nTalk soon!\n\nAyushi Dubey,\nCustomer Success Manager,\nPushEngage\n\nP.S.: Get a sneak peek at every campaign type and pop-up modal for web push notifications.\n\nP.P.S.: If you like video tutorials more, check out this playlist on our official YouTube channel: PushEngage Quick Tour.\n---\n\nEach email should:\n- Have an exciting, celebratory subject line\n- Start with a warm personal introduction from Ayushi as CSM\n- Mention PushEngage works with thousands of businesses\n- If their platform is detected (Shopify, WordPress, etc.), mention you have specific tips for that platform\n- If competitor_tools.detected_competitor is present, subtly mention you can help them get even better results\n- Offer to set up a one-on-one consultation call\n- Ask them to reply with their availability\n- Include P.S. with campaign types guide mention\n- Include P.P.S. with YouTube playlist mention\n- Sound genuinely excited and helpful, not salesy\n\nReturn ONLY valid JSON (no markdown, no explanations):\n{\n  \"variant_1\": {\n    \"subject\": \"string (exciting, celebratory)\",\n    \"body\": \"string\",\n    \"approach\": \"welcome_consultation\"\n  },\n  \"variant_2\": {\n    \"subject\": \"string (value-focused)\",\n    \"body\": \"string\",\n    \"approach\": \"value_focused\"\n  },\n  \"variant_3\": {\n    \"subject\": \"string (resource-rich)\",\n    \"body\": \"string\",\n    \"approach\": \"resource_rich\"\n  },\n  \"recommended_variant\": 1,\n  \"personalization_notes\": \"string explaining why this variant was recommended\"\n}"
             },
             {
               "role": "user",
@@ -423,90 +423,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
       "position": [2450, 550]
-    },
-    {
-      "parameters": {
-        "channel": "#high-value-leads",
-        "text": "",
-        "blocksUi": {
-          "blocks": [
-            {
-              "type": "header",
-              "text": {
-                "type": "plain_text",
-                "text": "🔥 High Value Lead Alert!",
-                "emoji": true
-              }
-            },
-            {
-              "type": "section",
-              "fields": [
-                {
-                  "type": "mrkdwn",
-                  "text": "*Company:* {{ $json.company_profile.name }}"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Email:* {{ $json.email }}"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*ICP Score:* {{ $json.icp_analysis.icp_score }}/100"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Platform:* {{ $json.site_profile.platform }}"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Employees:* {{ $json.company_profile.employee_range }}"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Industry:* {{ $json.company_profile.industry }}"
-                }
-              ]
-            },
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": "*Key Insights:*\n• {{ $json.icp_analysis.key_insights.join('\\n• ') }}"
-              }
-            },
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": "*Competitor Tools:* {{ $json.competitor_tools.detected_competitor || 'None detected' }}"
-              }
-            },
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": "*Recommended Approach:*\n{{ $json.icp_analysis.recommended_approach }}"
-              }
-            },
-            {
-              "type": "divider"
-            },
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": "*Recommended Email Subject:*\n{{ $json.email_variants['variant_' + $json.email_variants.recommended_variant].subject }}"
-              }
-            }
-          ]
-        },
-        "otherOptions": {}
-      },
-      "id": "slack-notify-high",
-      "name": "Notify Slack - High Value",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.1,
-      "position": [2450, 250]
     },
     {
       "parameters": {
@@ -845,20 +761,9 @@
         ]
       ]
     },
-    "Notify Slack - High Value": {
-      "main": [
-        []
-      ]
-    },
     "Save as Gmail Draft": {
       "main": [
-        [
-          {
-            "node": "Notify Slack - High Value",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Add to Tracking Sheet": {
