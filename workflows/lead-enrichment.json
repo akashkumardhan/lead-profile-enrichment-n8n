@@ -485,18 +485,6 @@
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"lead_id\": \"{{ $('Extract Domain Info').first().json.userId }}\",\n  \"email\": \"{{ $('Extract Domain Info').first().json.email }}\",\n  \"company\": \"{{ $json.company_profile.name }}\",\n  \"icp_score\": {{ $json.icp_analysis.icp_score }},\n  \"icp_tier\": \"{{ $json.icp_analysis.icp_tier }}\",\n  \"enrichment_quality\": {{ $json.enrichment_quality }},\n  \"processed_at\": \"{{ $now.toISO() }}\"\n}",
-        "options": {}
-      },
-      "id": "respond-webhook",
-      "name": "Respond to Webhook",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [2850, 400]
-    },
-    {
-      "parameters": {
         "content": "## Lead Profile Enrichment Automation\n\n### Workflow Overview\nThis workflow enriches new signup leads with data from multiple sources, scores them against your ICP, and generates personalized outreach emails.\n\n### Free/Freemium Services Used:\n- **Hunter.io** (50 free/month) - Email verification & domain search\n- **Apollo.io** (60 credits/month free) - Person & company enrichment\n- **HTML Scraping** (FREE) - Tech stack & platform detection\n- **PDL (People Data Labs)** (free tier) - Company enrichment fallback\n- **Google Gemini Flash** (~$0.001/lead) - ICP scoring & email generation\n\n### Required Credentials:\n1. Hunter.io API Key\n2. Apollo.io API Key\n3. PDL API Key (optional fallback)\n4. Google Gemini API Key\n5. Google Sheets OAuth\n6. Gmail OAuth\n7. Slack OAuth (optional)\n\n### Webhook Payload Format:\n```json\n{\n  \"email\": \"user@company.com\",\n  \"website_url\": \"https://company.com\",\n  \"signup_plan\": \"free\",\n  \"user_id\": \"12345\",\n  \"signup_timestamp\": \"2024-01-15T10:30:00Z\"\n}\n```",
         "height": 580,
         "width": 360,
@@ -805,13 +793,7 @@
     },
     "Add to Tracking Sheet": {
       "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     }
   },
