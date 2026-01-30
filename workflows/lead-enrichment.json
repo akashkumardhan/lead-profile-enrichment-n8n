@@ -329,12 +329,12 @@
           },
           "conditions": [
             {
-              "id": "high-value-check",
+              "id": "high-medium-value-check",
               "leftValue": "={{ $json.icp_analysis.icp_tier }}",
-              "rightValue": "HIGH",
+              "rightValue": "LOW",
               "operator": {
                 "type": "string",
-                "operation": "equals"
+                "operation": "notEquals"
               }
             }
           ],
@@ -343,7 +343,7 @@
         "options": {}
       },
       "id": "check-high-value",
-      "name": "Is High Value?",
+      "name": "Is High/Medium Value?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [2250, 400]
@@ -815,14 +815,14 @@
       "main": [
         [
           {
-            "node": "Is High Value?",
+            "node": "Is High/Medium Value?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Is High Value?": {
+    "Is High/Medium Value?": {
       "main": [
         [
           {
