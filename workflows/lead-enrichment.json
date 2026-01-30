@@ -756,11 +756,6 @@
         ],
         [
           {
-            "node": "Save as Gmail Draft",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Add to Tracking Sheet",
             "type": "main",
             "index": 0
