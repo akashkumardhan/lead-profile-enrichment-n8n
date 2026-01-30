@@ -34,6 +34,9 @@ services:
       # Enable community nodes
       - N8N_COMMUNITY_PACKAGES_ENABLED=true
 
+      # IMPORTANT: Allow access to environment variables in workflow nodes
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+
       # API Keys for Enrichment Services (accessible via $env in workflows)
       - HUNTER_API_KEY=${HUNTER_API_KEY}
       - APOLLO_API_KEY=${APOLLO_API_KEY}
